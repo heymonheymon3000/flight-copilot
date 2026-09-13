@@ -17,6 +17,7 @@ def main():
                 "id",
                 "question",
                 "should_answer",
+                "airport_filter",
                 "answer",
                 "num_chunks_retrieved",
                 "retrieved_chunks",
@@ -27,12 +28,16 @@ def main():
             result = query(q["question"])
             answer = result["answer"]
             chunks = result["chunks"]
-            print(f"\n[{q['id']}] Q: {q['question']}\nA: {answer}\n{'-'*60}")
+            airport = result["airport"] or ""
+            print(
+                f"\n[{q['id']}] airport_filter={airport or '-'}\nQ: {q['question']}\nA: {answer}\n{'-'*60}"
+            )
             writer.writerow(
                 [
                     q["id"],
                     q["question"],
                     q["should_answer"],
+                    airport,
                     answer,
                     len(chunks),
                     CHUNK_SEP.join(chunks),
