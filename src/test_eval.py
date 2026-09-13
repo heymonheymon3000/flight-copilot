@@ -1,0 +1,45 @@
+import csv
+import json
+
+from src.paths import EVALS
+from src.query import query
+
+CHUNK_SEP = "\n\n===CHUNK===\n\n"
+
+
+def main():
+    questions = json.loads((EVALS / "questions.json").read_text(encoding="utf-8"))
+
+    with open(EVALS / "eval_log.csv", "w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(
+            [
+                "id",
+                "question",
+                "should_answer",
+                "answer",
+                "num_chunks_retrieved",
+                "retrieved_chunks",
+                "notes",
+            ]
+        )
+        for q in questions:
+            result = query(q["question"])
+            answer = result["answer"]
+            chunks = result["chunks"]
+            print(f"\n[{q['id']}] Q: {q['question']}\nA: {answer}\n{'-'*60}")
+            writer.writerow(
+                [
+                    q["id"],
+                    q["question"],
+                    q["should_answer"],
+                    answer,
+                    len(chunks),
+                    CHUNK_SEP.join(chunks),
+                    "",
+                ]
+            )
+
+
+if __name__ == "__main__":
+    main()

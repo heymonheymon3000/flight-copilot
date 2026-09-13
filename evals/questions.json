@@ -1,0 +1,22 @@
+[
+  {"id": "q001", "question": "What kinds of incidents have been reported involving turbulence at cruise altitude?", "should_answer": true},
+  {"id": "q002", "question": "What issues have pilots reported related to air traffic control communication or vectoring?", "should_answer": true},
+  {"id": "q003", "question": "Have any reports mentioned aircraft performance problems near maximum altitude?", "should_answer": true},
+  {"id": "q004", "question": "What weather-related conditions have contributed to reported incidents?", "should_answer": true},
+  {"id": "q005", "question": "Have any reports described conflicts between requested altitude changes and traffic separation?", "should_answer": true},
+  {"id": "q006", "question": "What actions did crews take in response to unexpected turbulence or airspeed loss?", "should_answer": true},
+  {"id": "q007", "question": "Are there any reports involving flight attendant or passenger safety during turbulence events?", "should_answer": true},
+  {"id": "q008", "question": "What role did TCAS or traffic alerts play in any reported events?", "should_answer": true},
+  {"id": "q009", "question": "Have any reports mentioned maintenance status or deferred maintenance items as a factor?", "should_answer": true},
+  {"id": "q010", "question": "What is a typical example of how a crew responded to a thunderstorm-related encounter?", "should_answer": true},
+  {"id": "q011", "question": "What runway incursion or taxiway confusion events have been reported at ATL?", "should_answer": true},
+  {"id": "q012", "question": "What causes of go-arounds or rejected landings appear in the reports?", "should_answer": true},
+  {"id": "q013", "question": "What ground delay, gate hold, or pushback problems have crews reported?", "should_answer": true},
+  {"id": "q014", "question": "Have any reports described fatigue or duty-time issues as a contributing factor?", "should_answer": true},
+  {"id": "q015", "question": "What problems with de-icing or winter operations have been reported?", "should_answer": true},
+  {"id": "q016", "question": "Have any reports involved laser illumination of the cockpit?", "should_answer": true},
+  {"id": "q017", "question": "What was Delta Air Lines' on-time arrival percentage at ATL in 2025?", "should_answer": false},
+  {"id": "q018", "question": "How many passengers did Hartsfield-Jackson serve in 2025?", "should_answer": false},
+  {"id": "q019", "question": "What is the FAA's current rule on pilot retirement age?", "should_answer": false},
+  {"id": "q020", "question": "Which airline had the most ASRS reports filed in 2025?", "should_answer": false}
+]
