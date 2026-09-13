@@ -37,9 +37,11 @@ ASRS CSV export (4,584 air carrier narratives, Jan 2025 – Aug 2026)
 
 Corpus size mattered: on an earlier 116-narrative corpus (Georgia-only filter), the turbulence question returned a single incident. On the 4,584-narrative corpus the same question, prompt, and model returned eight distinct incident categories, all traceable to source.
 
-### Known retrieval gap
+### Retrieval gap found and fixed via evals
 
-`q011` asks about runway incursions *at ATL*. The retriever returned five ORD reports and the model correctly refused rather than fabricating an ATL answer — but ATL reports do exist in the corpus. The runway-incursion semantics outweighed the airport token in the embedding. A neighboring question (`q017`) that named ATL without a strong topical signal *did* retrieve ATL reports, confirming the airport is embedded but not dominant. Fix in progress: attach the ASRS locale/airport field as chunk metadata at ingest and apply a ChromaDB `where` filter when a question names an airport.
+`q011` asks about runway incursions *at ATL*. On the first run the retriever returned five ORD reports and the model correctly refused rather than fabricating — but two matching ATL reports existed in the corpus. Diagnosis: ATL has 10 tagged reports vs. ORD's 98, and the runway-incursion semantics outweighed the airport token in the embedding.
+
+Fix: the ASRS `Locale Reference` field is now parsed into an `airport` metadata tag at ingest (974 of 4,584 reports carry a real code; the rest are de-identified as `ZZZ`), and `query.py` applies a ChromaDB `where` filter when a question names a known airport code. With the filter on, both ATL reports surface and the answer is grounded. Scoring the 10 ATL documents also showed cosine distances packed between 0.997 and 1.328 — evidence that pure vector similarity discriminates poorly among same-airport narratives, which motivates a reranker as a later step.
 
 ## Repository layout
 
@@ -100,7 +102,7 @@ All scripts run as modules from the repo root and resolve paths via `src/paths.p
 
 ## Roadmap
 
-1. Airport metadata filtering to close the `q011` retrieval gap
+1. Reranking to sharpen retrieval within a single airport, where cosine distance alone discriminates poorly (see the ATL fix above)
 2. LLM-as-judge scoring calibrated against the hand grades in `eval_grades.csv`, so evals can run unattended
 3. Ingest DOT/BTS On-Time Performance data and add query routing so questions like "Delta's on-time rate at ATL" (currently a correct refusal) become answerable
 4. Retrieval quality iteration: chunk sizing, hybrid search, reranking — measured against the eval set, not vibes
