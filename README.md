@@ -23,10 +23,11 @@ ASRS CSV export (4,584 air carrier narratives, Jan 2025 – Aug 2026)
 - **Vector store:** ChromaDB, persisted to `data/chroma_db/`
 - **Generation:** `us.anthropic.claude-sonnet-4-5-20250929-v1:0` via Bedrock inference profile, with exponential-backoff retry
 - **Grounding contract:** the model is instructed to answer only from retrieved context and to say so when the context doesn't cover the question
+- **Airport metadata filtering:** the ASRS locale field is parsed into an `airport` tag at ingest; `query.py` detects a known airport code in the question and applies a ChromaDB `where` filter, widening `k` to cover the full airport-specific candidate set
 
 ## Eval results
 
-20 questions in `evals/questions.json`: 16 answerable from the corpus, 4 deliberately out of scope (`should_answer: false`) to test refusal behavior. Each answer was hand-graded against the retrieved chunks; grades and notes are in `evals/eval_grades.csv`.
+20 questions in `evals/questions.json`: 16 answerable from the corpus, 4 deliberately out of scope (`should_answer: false`) to test refusal behavior. Two (`q011`, `q017`) name ATL and trigger an airport metadata filter in retrieval. Each answer was hand-graded against the retrieved chunks; grades and notes are in `evals/eval_grades.csv`.
 
 | Metric | Result |
 |---|---|
@@ -105,8 +106,9 @@ All scripts run as modules from the repo root and resolve paths via `src/paths.p
 1. Reranking to sharpen retrieval within a single airport, where cosine distance alone discriminates poorly (see the ATL fix above)
 2. LLM-as-judge scoring calibrated against the hand grades in `eval_grades.csv`, so evals can run unattended
 3. Ingest DOT/BTS On-Time Performance data and add query routing so questions like "Delta's on-time rate at ATL" (currently a correct refusal) become answerable
-4. Retrieval quality iteration: chunk sizing, hybrid search, reranking — measured against the eval set, not vibes
+4. Retrieval quality iteration: chunk sizing, hybrid search — measured against the eval set, not vibes
 5. Cost and latency instrumentation per query
+6. Airport-name → code mapping (e.g. "Hartsfield-Jackson" → ATL) so the filter fires on names, not just codes
 
 ## Data source
 
