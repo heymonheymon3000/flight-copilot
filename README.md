@@ -24,6 +24,7 @@ ASRS CSV export (4,584 air carrier narratives, Jan 2025 – Aug 2026)
 - **Generation:** `us.anthropic.claude-sonnet-4-5-20250929-v1:0` via Bedrock inference profile, with exponential-backoff retry
 - **Grounding contract:** the model is instructed to answer only from retrieved context and to say so when the context doesn't cover the question
 - **Airport metadata filtering:** the ASRS locale field is parsed into an `airport` tag at ingest; `query.py` detects a known airport code in the question and applies a ChromaDB `where` filter, widening `k` to cover the full airport-specific candidate set
+- **Query routing:** delay/on-time/cancellation questions are detected by keyword and answered directly from BTS on-time performance data (`src/bts_stats.py`), bypassing the RAG path entirely — no LLM call, no hallucination risk for these
 
 ## Eval results
 
@@ -43,6 +44,8 @@ Corpus size mattered: on an earlier 116-narrative corpus (Georgia-only filter), 
 `q011` asks about runway incursions *at ATL*. On the first run the retriever returned five ORD reports and the model correctly refused rather than fabricating — but two matching ATL reports existed in the corpus. Diagnosis: ATL has 10 tagged reports vs. ORD's 98, and the runway-incursion semantics outweighed the airport token in the embedding.
 
 Fix: the ASRS `Locale Reference` field is now parsed into an `airport` metadata tag at ingest (974 of 4,584 reports carry a real code; the rest are de-identified as `ZZZ`), and `query.py` applies a ChromaDB `where` filter when a question names a known airport code. With the filter on, both ATL reports surface and the answer is grounded. Scoring the 10 ATL documents also showed cosine distances packed between 0.997 and 1.328 — evidence that pure vector similarity discriminates poorly among same-airport narratives, which motivates a reranker as a later step.
+
+`q017` ("Delta's on-time rate at ATL") was a correct refusal before BTS ingestion and is now a grounded, non-LLM answer — the second before/after pair in this project, alongside the airport-filter fix for `q011`.
 
 ## Repository layout
 
@@ -105,10 +108,9 @@ All scripts run as modules from the repo root and resolve paths via `src/paths.p
 
 1. Reranking to sharpen retrieval within a single airport, where cosine distance alone discriminates poorly (see the ATL fix above)
 2. LLM-as-judge scoring calibrated against the hand grades in `eval_grades.csv`, so evals can run unattended
-3. Ingest DOT/BTS On-Time Performance data and add query routing so questions like "Delta's on-time rate at ATL" (currently a correct refusal) become answerable
-4. Retrieval quality iteration: chunk sizing, hybrid search — measured against the eval set, not vibes
-5. Cost and latency instrumentation per query
-6. Airport-name → code mapping (e.g. "Hartsfield-Jackson" → ATL) so the filter fires on names, not just codes
+3. Retrieval quality iteration: chunk sizing, hybrid search — measured against the eval set, not vibes
+4. Cost and latency instrumentation per query
+5. Airport-name → code mapping (e.g. "Hartsfield-Jackson" → ATL) so the filter fires on names, not just codes
 
 ## Data source
 
