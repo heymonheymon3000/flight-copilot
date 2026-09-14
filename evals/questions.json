@@ -15,7 +15,7 @@
   {"id": "q014", "question": "Have any reports described fatigue or duty-time issues as a contributing factor?", "should_answer": true},
   {"id": "q015", "question": "What problems with de-icing or winter operations have been reported?", "should_answer": true},
   {"id": "q016", "question": "Have any reports involved laser illumination of the cockpit?", "should_answer": true},
-  {"id": "q017", "question": "What was Delta Air Lines' on-time arrival percentage at ATL in 2025?", "should_answer": false},
+  {"id": "q017", "question": "What was Delta Air Lines' on-time arrival percentage at ATL in 2025?", "should_answer": true},
   {"id": "q018", "question": "How many passengers did Hartsfield-Jackson serve in 2025?", "should_answer": false},
   {"id": "q019", "question": "What is the FAA's current rule on pilot retirement age?", "should_answer": false},
   {"id": "q020", "question": "Which airline had the most ASRS reports filed in 2025?", "should_answer": false}

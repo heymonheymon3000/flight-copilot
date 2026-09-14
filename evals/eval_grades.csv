@@ -15,7 +15,7 @@ q013,True,,y,"All 6 pushback failure modes map cleanly to the 5 chunks (brake-se
 q014,True,,y,"All 5 fatigue quotes (cumulative sleep deficit, 11hr/5-leg FA duty day, circadian swap, early-start SA, long day/night slide deployment) are verbatim from the chunks."
 q015,True,,y,"Well grounded overall; 'lack of contingency planning' is a soft inference from the MDT chunk rather than an explicit statement, but not a fabrication."
 q016,True,,y,"Correctly hedges uncertainty ('unsure if laser or drone', 'unclear if directed at us') rather than overclaiming a confirmed laser strike -- appropriately cautious given ambiguous source material."
-q017,False,ATL,y,"Correct abstention — this is should_answer=False and the corpus is ASRS safety narratives, not performance stats, so refusing to answer is the right behavior; no chunk supports an on-time percentage."
+q017,True,ATL,y,"Routed to BTS stats path, not RAG; numbers match direct on_time_summary() call"
 q018,False,,y,Correct refusal -- no passenger-volume data in any retrieved chunk (LAX/GSO/ONT incident reports only).
 q019,False,,y,"Correct refusal -- retrieved chunks are proficiency/bird-strike/turbulence reports, nothing about FAA retirement-age policy."
 q020,False,,y,Correct refusal with accurate reasoning about anonymized dates (XXXX/X-XX) preventing any 2025-specific comparison.

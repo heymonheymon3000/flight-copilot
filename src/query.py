@@ -8,6 +8,7 @@ from botocore.exceptions import ClientError
 from dotenv import load_dotenv
 from src.ingest import get_embedding
 from src.paths import CHROMA_DIR
+from src.bts_stats import on_time_summary, detect_carrier, CARRIER_NAMES
 
 load_dotenv()
 
@@ -20,6 +21,21 @@ RETRYABLE_ERRORS = {
 }
 DEFAULT_K = 5
 FILTERED_K = 10
+
+# Keywords that indicate the question is about delay/cancellation/on-time
+# performance (BTS data) rather than a safety narrative (ASRS data).
+STATS_KEYWORDS = (
+    "on-time",
+    "on time",
+    "ontime",
+    "delay",
+    "delayed",
+    "cancellation",
+    "cancelled",
+    "canceled",
+    "on-time rate",
+    "on-time percentage",
+)
 
 bedrock = boto3.client(
     "bedrock-runtime",
@@ -43,6 +59,39 @@ def detect_airport(question: str) -> str | None:
         if token in AIRPORT_COUNTS:
             return token
     return None
+
+
+def is_stats_question(question: str) -> bool:
+    q = question.lower()
+    return any(kw in q for kw in STATS_KEYWORDS)
+
+
+def answer_from_stats(question: str) -> dict:
+    airport = detect_airport(question)
+    carrier = detect_carrier(question)
+    stats = on_time_summary(airport=airport, carrier=carrier)
+
+    if stats["n_flights"] == 0:
+        scope = f"{CARRIER_NAMES.get(carrier, carrier)} " if carrier else ""
+        scope += f"at {airport} " if airport else ""
+        answer = (
+            f"The BTS on-time performance data on file (June 2025) has no {scope}"
+            f"flight records, so this can't be answered from what's currently loaded."
+        )
+    else:
+        who = stats["carrier_name"] or "All carriers"
+        where = f" at {stats['airport']}" if stats["airport"] else " system-wide"
+        answer = (
+            f"{who}{where}, {stats['period']} ({stats['n_flights']:,} flights):\n"
+            f"- On-time arrival rate: {stats['on_time_rate_pct']}%\n"
+            f"- Average arrival delay: {stats['avg_arr_delay_min']} min\n"
+            f"- Average departure delay: {stats['avg_dep_delay_min']} min\n"
+            f"- Cancellation rate: {stats['cancellation_rate_pct']}%\n\n"
+            f"Source: BTS Reporting Carrier On-Time Performance, June 2025 only. "
+            f"On-time is defined as arriving within 15 minutes of schedule."
+        )
+
+    return {"answer": answer, "chunks": [], "airport": airport, "source": "bts_stats"}
 
 
 def retrieve(question: str) -> tuple[list[str], str | None]:
@@ -97,9 +146,17 @@ Answer:"""
 
 
 def query(question: str) -> dict:
+    if is_stats_question(question):
+        return answer_from_stats(question)
+
     chunks, airport = retrieve(question)
     answer = ask_claude(question, chunks)
-    return {"answer": answer, "chunks": chunks, "airport": airport}
+    return {
+        "answer": answer,
+        "chunks": chunks,
+        "airport": airport,
+        "source": "asrs_rag",
+    }
 
 
 if __name__ == "__main__":
@@ -108,11 +165,11 @@ if __name__ == "__main__":
         if q.lower() in ("quit", "q"):
             break
         result = query(q)
+        print(f"\n[source: {result['source']}]", end="")
         if result["airport"]:
-            print(
-                f"\n[filtered to airport: {result['airport']}, {len(result['chunks'])} chunks]"
-            )
-        print("\n" + result["answer"])
-        print("\n--- Retrieved chunks ---")
-        for i, chunk in enumerate(result["chunks"], 1):
-            print(f"\n[{i}] {chunk[:200]}...")
+            print(f" [airport: {result['airport']}]", end="")
+        print("\n\n" + result["answer"])
+        if result["chunks"]:
+            print("\n--- Retrieved chunks ---")
+            for i, chunk in enumerate(result["chunks"], 1):
+                print(f"\n[{i}] {chunk[:200]}...")
