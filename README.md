@@ -1,8 +1,8 @@
 # Flight Safety Intelligence Copilot
 
-A retrieval-augmented question-answering system over NASA ASRS (Aviation Safety Reporting System) incident narratives, built on AWS Bedrock. Ask a natural-language question about air carrier safety events and get a grounded answer with the source reports that support it.
+A retrieval-augmented question-answering system over NASA ASRS (Aviation Safety Reporting System) incident narratives, built on AWS Bedrock. Ask a natural-language question about air carrier safety events and get a grounded answer with the source reports that support it. Delay and on-time performance questions are routed to a separate BTS statistics path instead of the RAG pipeline.
 
-The emphasis is on production concerns rather than a demo: a repeatable eval harness, hand-graded grounding results, explicit hallucination tests, and a documented retrieval gap with a planned fix.
+The emphasis is on production concerns rather than a demo: a repeatable eval harness, hand-graded grounding results, explicit hallucination tests, and two documented gaps found via evals and fixed in place.
 
 ## Architecture
 
@@ -12,7 +12,10 @@ ASRS CSV export (4,584 air carrier narratives, Jan 2025 – Aug 2026)
         ▼
   src/ingest.py ── Bedrock Titan Text Embeddings v2 ──▶ ChromaDB (local, persistent)
                                                               │
-   question ──▶ embed ──▶ top-k similarity search ◀───────────┘
+   question ──▶ is it a delay/on-time question? ──yes──▶ src/bts_stats.py ──▶ answer (no LLM call)
+                                │no
+                                ▼
+                          embed ──▶ top-k similarity search ◀── ChromaDB
                                 │
                                 ▼
                    src/query.py ── Claude Sonnet 4.5 on Bedrock ──▶ answer + retrieved chunks
@@ -28,16 +31,18 @@ ASRS CSV export (4,584 air carrier narratives, Jan 2025 – Aug 2026)
 
 ## Eval results
 
-20 questions in `evals/questions.json`: 16 answerable from the corpus, 4 deliberately out of scope (`should_answer: false`) to test refusal behavior. Two (`q011`, `q017`) name ATL and trigger an airport metadata filter in retrieval. Each answer was hand-graded against the retrieved chunks; grades and notes are in `evals/eval_grades.csv`.
+20 questions in `evals/questions.json`: 17 answerable (16 from ASRS, 1 from BTS stats), 3 deliberately out of scope (`should_answer: false`) to test refusal behavior. Two questions (`q011`, `q017`) name ATL; `q011` triggers the ASRS airport metadata filter, `q017` routes to BTS stats. Each answer was hand-graded against its retrieved chunks or source data; grades and notes are in `evals/eval_grades.csv`.
 
 | Metric | Result |
 |---|---|
-| Answerable questions fully grounded | 15 / 16 |
-| Partially grounded | 1 / 16 (one soft inference about icing conditions not explicitly stated in source) |
+| Answerable questions fully grounded | 16 / 17 |
+| Partially grounded | 1 / 17 (one soft inference about icing conditions not explicitly stated in source) |
 | Hallucinated claims | 0 |
-| Out-of-scope questions correctly refused | 4 / 4 |
+| Out-of-scope questions correctly refused | 3 / 3 |
 
 Corpus size mattered: on an earlier 116-narrative corpus (Georgia-only filter), the turbulence question returned a single incident. On the 4,584-narrative corpus the same question, prompt, and model returned eight distinct incident categories, all traceable to source.
+
+`q017` ("Delta's on-time rate at ATL") was a correct refusal before BTS ingestion and is now a grounded, non-LLM answer — the second before/after pair in this project, alongside the airport-filter fix for `q011`.
 
 ### Retrieval gap found and fixed via evals
 
@@ -45,14 +50,12 @@ Corpus size mattered: on an earlier 116-narrative corpus (Georgia-only filter), 
 
 Fix: the ASRS `Locale Reference` field is now parsed into an `airport` metadata tag at ingest (974 of 4,584 reports carry a real code; the rest are de-identified as `ZZZ`), and `query.py` applies a ChromaDB `where` filter when a question names a known airport code. With the filter on, both ATL reports surface and the answer is grounded. Scoring the 10 ATL documents also showed cosine distances packed between 0.997 and 1.328 — evidence that pure vector similarity discriminates poorly among same-airport narratives, which motivates a reranker as a later step.
 
-`q017` ("Delta's on-time rate at ATL") was a correct refusal before BTS ingestion and is now a grounded, non-LLM answer — the second before/after pair in this project, alongside the airport-filter fix for `q011`.
-
 ## Repository layout
 
 ```
 flight-copilot/
 ├── data/                  gitignored
-│   ├── raw/               ASRS CSV exports
+│   ├── raw/               ASRS and BTS CSV exports
 │   └── chroma_db/         persisted vector store
 ├── evals/
 │   ├── questions.json     eval set with ids and should_answer flags
@@ -61,7 +64,8 @@ flight-copilot/
 └── src/
     ├── paths.py           repo-relative path constants
     ├── ingest.py          CSV → embeddings → ChromaDB
-    ├── query.py           retrieval + generation
+    ├── query.py           retrieval + generation + BTS routing
+    ├── bts_stats.py        BTS on-time performance lookups
     ├── test_eval.py       runs every question, writes eval_log.csv
     ├── spot_check.py      interactive grader, writes eval_grades.csv
     └── inspect_data.py    ASRS export inspection helper
@@ -79,7 +83,7 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### Get the data
+### Get the ASRS data
 
 1. Go to https://asrs.arc.nasa.gov/search/database.html
 2. Add search items: *Reporter Organization was Air Carrier*, *Date of Incident between January-2025 and August-2026*
@@ -87,6 +91,15 @@ pip install -r requirements.txt
 4. Save as `data/raw/asrs_air_carrier_2025_2026.csv`
 
 ASRS exports have a two-row header (category, field name). `ingest.py` reads it with `pd.read_csv(..., header=[0, 1])` and takes narrative text from `("Report 1", "Narrative")`, falling back to `("Report 1", "Synopsis")`.
+
+### Get the BTS data
+
+1. Go to https://www.transtats.bts.gov and navigate to **Airline Information for Download → Airline Service Quality Performance 234 (On-Time performance data)**
+2. Filter Year: **2025**, Filter Period: **June**, Filter Geography: **All**
+3. Check fields: `FlightDate`, `Reporting_Airline`, `Origin`, `Dest`, `DepDelayMinutes`, `ArrDelayMinutes`, `Cancelled`, `CancellationCode`
+4. Download and save as `data/raw/bts_june_2025.csv`
+
+Currently covers June 2025 only; `src/bts_stats.py` reads this single file. Adding more months means downloading additional CSVs and concatenating them before the stats functions will reflect a wider period.
 
 ### Build and run
 
@@ -103,6 +116,7 @@ All scripts run as modules from the repo root and resolve paths via `src/paths.p
 - Newer Claude models on Bedrock require the inference-profile ID (`us.` prefix), not the bare model ID, for on-demand invocation.
 - First-time Anthropic model use on Bedrock requires a use-case form; propagation across regions took 15–60 minutes and caused intermittent failures during that window, which is why `ask_claude()` retries with backoff.
 - ASRS *Location* is only populated on a subset of reports; filtering on it in the ASRS query tool dropped the corpus from 15,692 to 56. Filter on date and reporter organization instead, and handle location at query time.
+- BTS's raw monthly `.asc` download (from the "Airline Service Quality Performance" file list) is pipe-delimited with no header row and 40+ positional fields — not worth reverse-engineering. The TranStats field-selection tool at the same site exports a labeled CSV with only the chosen columns instead.
 
 ## Roadmap
 
@@ -111,7 +125,9 @@ All scripts run as modules from the repo root and resolve paths via `src/paths.p
 3. Retrieval quality iteration: chunk sizing, hybrid search — measured against the eval set, not vibes
 4. Cost and latency instrumentation per query
 5. Airport-name → code mapping (e.g. "Hartsfield-Jackson" → ATL) so the filter fires on names, not just codes
+6. Expand BTS coverage beyond June 2025 (additional months) and beyond ATL-only routing (other hub airports)
 
-## Data source
+## Data sources
 
-NASA Aviation Safety Reporting System — https://asrs.arc.nasa.gov. ASRS reports are voluntary, de-identified, and not a statistical sample of all events; findings from this tool describe what was reported, not incident rates.
+- NASA Aviation Safety Reporting System — https://asrs.arc.nasa.gov. ASRS reports are voluntary, de-identified, and not a statistical sample of all events; findings from this tool describe what was reported, not incident rates.
+- U.S. DOT Bureau of Transportation Statistics, Reporting Carrier On-Time Performance — https://www.transtats.bts.gov
