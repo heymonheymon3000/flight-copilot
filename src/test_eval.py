@@ -18,6 +18,7 @@ def main():
                 "question",
                 "should_answer",
                 "airport_filter",
+                "source",
                 "answer",
                 "num_chunks_retrieved",
                 "retrieved_chunks",
@@ -29,8 +30,9 @@ def main():
             answer = result["answer"]
             chunks = result["chunks"]
             airport = result["airport"] or ""
+            source = result["source"]
             print(
-                f"\n[{q['id']}] airport_filter={airport or '-'}\nQ: {q['question']}\nA: {answer}\n{'-'*60}"
+                f"\n[{q['id']}] source={source} airport_filter={airport or '-'}\nQ: {q['question']}\nA: {answer}\n{'-'*60}"
             )
             writer.writerow(
                 [
@@ -38,6 +40,7 @@ def main():
                     q["question"],
                     q["should_answer"],
                     airport,
+                    source,
                     answer,
                     len(chunks),
                     CHUNK_SEP.join(chunks),

@@ -24,18 +24,8 @@ FILTERED_K = 10
 
 # Keywords that indicate the question is about delay/cancellation/on-time
 # performance (BTS data) rather than a safety narrative (ASRS data).
-STATS_KEYWORDS = (
-    "on-time",
-    "on time",
-    "ontime",
-    "delay",
-    "delayed",
-    "cancellation",
-    "cancelled",
-    "canceled",
-    "on-time rate",
-    "on-time percentage",
-)
+STATS_TOPIC_WORDS = ("on-time", "on time", "ontime", "cancellation")
+STATS_METRIC_WORDS = ("rate", "percentage", "percent", "performance", "%")
 
 bedrock = boto3.client(
     "bedrock-runtime",
@@ -63,7 +53,9 @@ def detect_airport(question: str) -> str | None:
 
 def is_stats_question(question: str) -> bool:
     q = question.lower()
-    return any(kw in q for kw in STATS_KEYWORDS)
+    has_topic = any(t in q for t in STATS_TOPIC_WORDS)
+    has_metric = any(m in q for m in STATS_METRIC_WORDS)
+    return has_topic and has_metric
 
 
 def answer_from_stats(question: str) -> dict:
@@ -114,6 +106,8 @@ def retrieve(question: str) -> tuple[list[str], str | None]:
 def ask_claude(question: str, context_chunks: list[str], max_retries: int = 3) -> str:
     context = "\n\n---\n\n".join(context_chunks)
     prompt = f"""You are an aviation safety assistant. Answer the question using ONLY the context below, which is drawn from real ASRS aviation safety incident reports. If the context doesn't contain a clear answer, say so explicitly.
+
+Report only what the reports describe happening. Do not classify an event against a formal term (e.g. "incursion," "violation," "near miss") unless the source text itself uses that term — describe the event and let the reader draw that conclusion.
 
 Context:
 {context}

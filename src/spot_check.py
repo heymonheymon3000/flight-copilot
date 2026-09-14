@@ -40,7 +40,7 @@ def main():
 
     for r in rows:
         print(
-            f"\n{'='*80}\n[{r['id']}] should_answer={r['should_answer']} airport_filter={r['airport_filter'] or '-'}"
+            f"\n{'='*80}\n[{r['id']}] should_answer={r['should_answer']} airport_filter={r['airport_filter'] or '-'} source={r['source']}"
         )
         print(f"Q: {r['question']}\n{'-'*80}")
         print("ANSWER:\n" + textwrap.fill(r["answer"], 100))
@@ -53,13 +53,22 @@ def main():
             "id": r["id"],
             "should_answer": r["should_answer"],
             "airport_filter": r["airport_filter"],
+            "source": r["source"],
             "grounded": grounded,
             "note": note,
         }
 
     with open(grades_path, "w", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(
-            f, fieldnames=["id", "should_answer", "airport_filter", "grounded", "note"]
+            f,
+            fieldnames=[
+                "id",
+                "should_answer",
+                "airport_filter",
+                "source",
+                "grounded",
+                "note",
+            ],
         )
         w.writeheader()
         w.writerows(existing[k] for k in sorted(existing))
